@@ -2,6 +2,7 @@ package just.trust.me;
 
 import android.content.Context;
 import android.net.http.SslError;
+import android.net.http.X509TrustManagerExtensions;
 import android.util.Log;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebView;
@@ -34,6 +35,7 @@ import java.util.List;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -99,6 +101,20 @@ public class Main implements IXposedHookLoadPackage {
 
                 setObjectField(param.thisObject, "defaultParams", params);
                 setObjectField(param.thisObject, "connManager", getCCM(param.args[0], params));
+            }
+        });
+
+        findAndHookMethod(X509TrustManagerExtensions.class, "checkServerTrusted", X509Certificate[].class, String.class, String.class, new XC_MethodReplacement() {
+            @Override
+            protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                return param.args[0];
+            }
+        });
+
+        findAndHookMethod("android.security.net.config.NetworkSecurityTrustManager", lpparam.classLoader, "checkPins", List.class, new XC_MethodReplacement() {
+            @Override
+            protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                return null;
             }
         });
 
@@ -303,6 +319,23 @@ public class Main implements IXposedHookLoadPackage {
                             return list;
                         }
                     });
+
+            findAndHookMethod("com.android.org.conscrypt.TrustManagerImpl", lpparam.classLoader, "checkTrusted", X509Certificate[].class, String.class, SSLSession.class, SSLParameters.class, boolean.class, new XC_MethodReplacement() {
+                @Override
+                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                    ArrayList<X509Certificate> list = new ArrayList<X509Certificate>();
+                    return list;
+                }
+            });
+
+
+            findAndHookMethod("com.android.org.conscrypt.TrustManagerImpl", lpparam.classLoader, "checkTrusted", X509Certificate[].class, byte[].class, byte[].class, String.class, String.class, boolean.class, new XC_MethodReplacement() {
+                @Override
+                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                    ArrayList<X509Certificate> list = new ArrayList<X509Certificate>();
+                    return list;
+                }
+            });
         }
 
     } // End Hooks
@@ -502,6 +535,28 @@ public class Main implements IXposedHookLoadPackage {
             Log.d(TAG, "OKHTTP 3.x not found in " + currentPackageName + " -- not hooking OkHostnameVerifier.verify(String, X509)(");
             // pass
         }
+
+        //https://github.com/square/okhttp/blob/okhttp_4.2.x/okhttp/src/main/java/okhttp3/CertificatePinner.kt
+        Log.d(TAG, "Hooking okhttp3.CertificatePinner.check(String,List) (4.2.0+) for: " + currentPackageName);
+
+        try {
+            classLoader.loadClass("okhttp3.CertificatePinner");
+            findAndHookMethod("okhttp3.CertificatePinner",
+                    classLoader,
+                    "check$okhttp",
+                    String.class,
+                    "kotlin.jvm.functions.Function0",
+                    new XC_MethodReplacement() {
+                        @Override
+                        protected Object replaceHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                            return null;
+                        }
+                    });
+        } catch (ClassNotFoundException e) {
+            Log.d(TAG, "OKHTTP 4.2.0+ not found in " + currentPackageName + " -- not hooking");
+            // pass
+        }
+
     }
 
     void processHttpClientAndroidLib(ClassLoader classLoader) {
@@ -534,10 +589,10 @@ public class Main implements IXposedHookLoadPackage {
         public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
         }
 
-	public List<X509Certificate> checkServerTrusted(X509Certificate[] chain, String authType, String host) throws CertificateException {
-		ArrayList<X509Certificate> list = new ArrayList<X509Certificate>();
-		return list;
-	}
+        public List<X509Certificate> checkServerTrusted(X509Certificate[] chain, String authType, String host) throws CertificateException {
+            ArrayList<X509Certificate> list = new ArrayList<X509Certificate>();
+            return list;
+        }
 
         @Override
         public X509Certificate[] getAcceptedIssuers() {
